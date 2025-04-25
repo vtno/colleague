@@ -1,0 +1,220 @@
+<div class="result-container">
+  <h2>Conversation with Document</h2>
+  
+  <div class="document-info">
+    <p>Document: <strong><%= @filename %></strong></p>
+  </div>
+  
+  <div class="conversation-history" id="conversation-history">
+    <% if @conversation && @conversation.length > 0 %>
+      <% @conversation.each_with_index do |exchange, index| %>
+        <div class="exchange <%= index == @conversation.length - 1 ? 'current' : '' %>">
+          <div class="question-box">
+            <h3>Your Question:</h3>
+            <p><%= exchange[:question] %></p>
+          </div>
+          
+          <div class="answer-box">
+            <h3>Answer:</h3>
+            <% if index == @conversation.length - 1 && !exchange[:answer] %>
+              <div id="streaming-answer" class="answer-content">
+                <div class="loading">Thinking</div>
+              </div>
+            <% else %>
+              <div class="answer-content">
+                <%= exchange[:answer]&.gsub("\n", "<br>") %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    <% else %>
+      <div class="exchange current">
+        <div class="question-box">
+          <h3>Your Question:</h3>
+          <p><%= @question %></p>
+        </div>
+        
+        <div class="answer-box">
+          <h3>Answer:</h3>
+          <div id="streaming-answer" class="answer-content">
+            <div class="loading">Thinking</div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+  
+  <div class="followup-question-container" id="followup-question-container" style="display: none;">
+    <h3>Ask a Follow-up Question</h3>
+    <form action="/ask" method="post" id="followup-form">
+      <div class="form-group">
+        <textarea id="question" name="question" rows="2" required placeholder="What else would you like to know?"></textarea>
+      </div>
+      <button type="submit" class="btn-primary">
+        <span class="btn-text">Ask</span>
+        <span class="btn-loading" style="display: none;">Sending...</span>
+      </button>
+    </form>
+  </div>
+  
+  <div class="navigation">
+    <a href="/ask" class="btn-secondary">Start New Question</a>
+    <a href="/" class="btn-secondary">Upload Different Document</a>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const answerElement = document.getElementById('streaming-answer');
+    const followupContainer = document.getElementById('followup-question-container');
+    const followupForm = document.getElementById('followup-form');
+    let responseText = '';
+    
+    // Only initialize streaming if there's an element to stream to
+    if (answerElement) {
+      // Create an EventSource for Server-Sent Events
+      const eventSource = new EventSource('/stream_analysis');
+      
+      // Clear the loading message when we start receiving data
+      let isFirstMessage = true;
+      let reconnectAttempts = 0;
+      const maxReconnectAttempts = 3;
+      
+      // Add a timeout to show an error if no response is received within 30 seconds
+      const connectionTimeout = setTimeout(() => {
+        if (isFirstMessage) {
+          answerElement.innerHTML = '<div class="error">Response timeout. The server took too long to respond.</div>';
+          eventSource.close();
+          // Still show the follow-up form even if there was an error
+          followupContainer.style.display = 'block';
+        }
+      }, 30000);
+      
+      // Handle incoming messages
+      eventSource.onmessage = function(event) {
+        // Clear the timeout since we got a response
+        clearTimeout(connectionTimeout);
+        
+        // Remove the loading indicator on first message
+        if (isFirstMessage) {
+          answerElement.innerHTML = '';
+          isFirstMessage = false;
+        }
+        
+        const data = event.data;
+        
+        // Check if this is the end of the stream
+        if (data === '[DONE]') {
+          // Add a copy button if the response is substantial
+          if (responseText.length > 100) {
+            addCopyButton();
+          }
+          
+          // Show the follow-up question form when streaming is complete
+          followupContainer.style.display = 'block';
+          
+          // Scroll to the follow-up question form
+          setTimeout(() => {
+            followupContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 300);
+          
+          eventSource.close();
+          return;
+        }
+        
+        // Check if we received an error
+        if (data.startsWith('Error:')) {
+          answerElement.innerHTML += `<div class="error">${data}</div>`;
+          followupContainer.style.display = 'block';
+          eventSource.close();
+          return;
+        }
+        
+        // Handle newlines that were escaped in the SSE format
+        const formattedData = data.replace(/\\n/g, '<br>');
+        responseText += formattedData;
+        
+        // Append the new text
+        answerElement.innerHTML = responseText;
+        
+        // Auto-scroll to the bottom of the answer
+        answerElement.scrollTop = answerElement.scrollHeight;
+      };
+      
+      // Handle connection open
+      eventSource.onopen = function() {
+        reconnectAttempts = 0;
+      };
+      
+      // Handle errors
+      eventSource.onerror = function(error) {
+        clearTimeout(connectionTimeout);
+        
+        // Try to reconnect a few times before showing an error
+        if (reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++;
+          return; // EventSource will automatically try to reconnect
+        }
+        
+        if (isFirstMessage) {
+          answerElement.innerHTML = '<div class="error">Connection error. Please try again.</div>';
+        } else {
+          answerElement.innerHTML += '<div class="error">Connection lost. The response may be incomplete.</div>';
+        }
+        
+        followupContainer.style.display = 'block';
+        eventSource.close();
+      };
+    } else {
+      // If there's no streaming answer element, show the follow-up form right away
+      followupContainer.style.display = 'block';
+    }
+    
+    // Show loading state when follow-up form is submitted
+    if (followupForm) {
+      followupForm.addEventListener('submit', function() {
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.querySelector('.btn-text').style.display = 'none';
+        submitBtn.querySelector('.btn-loading').style.display = 'inline';
+        submitBtn.disabled = true;
+      });
+    }
+    
+    // Scroll to the most recent exchange
+    const currentExchange = document.querySelector('.exchange.current');
+    if (currentExchange) {
+      setTimeout(() => {
+        currentExchange.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
+    
+    // Function to add a copy button to the response
+    function addCopyButton() {
+      // Only add if we're streaming to the current answer
+      if (!answerElement) return;
+      
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-btn';
+      copyButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Response';
+      copyButton.addEventListener('click', function() {
+        // Create a textarea to copy the text without HTML formatting
+        const textarea = document.createElement('textarea');
+        textarea.value = responseText.replace(/<br>/g, '\n');
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        // Show feedback that it was copied
+        this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+        setTimeout(() => {
+          this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Response';
+        }, 2000);
+      });
+      
+      // Add the button after the answer content
+      answerElement.parentNode.insertBefore(copyButton, answerElement.nextSibling);
+    }
+  });
+</script>

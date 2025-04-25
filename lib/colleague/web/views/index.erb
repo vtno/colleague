@@ -1,0 +1,54 @@
+<div class="upload-container">
+  <h2>Upload a Document</h2>
+  
+  <% if @error %>
+    <div class="error-message">
+      <%= @error %>
+    </div>
+  <% end %>
+  
+  <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form">
+    <div class="form-group">
+      <label for="file">Select a document to analyze</label>
+      <div class="file-input-wrapper">
+        <input type="file" id="file" name="file" accept=".pdf,.docx,.pptx,.txt">
+        <div class="file-name" id="file-name">No file selected</div>
+      </div>
+      <div class="file-types">
+        <small>Supported formats: PDF, DOCX, PPTX, TXT</small>
+      </div>
+    </div>
+    
+    <button type="submit" class="btn-primary" id="upload-btn">
+      <span class="btn-text">Upload Document</span>
+      <span class="btn-loading" style="display: none;">Uploading...</span>
+    </button>
+  </form>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('file');
+    const fileName = document.getElementById('file-name');
+    const uploadForm = document.getElementById('upload-form');
+    const uploadBtn = document.getElementById('upload-btn');
+    
+    // Update file name display when file is selected
+    fileInput.addEventListener('change', function() {
+      if (this.files.length > 0) {
+        fileName.textContent = this.files[0].name;
+        fileName.classList.add('has-file');
+      } else {
+        fileName.textContent = 'No file selected';
+        fileName.classList.remove('has-file');
+      }
+    });
+    
+    // Show loading state when form is submitted
+    uploadForm.addEventListener('submit', function() {
+      uploadBtn.querySelector('.btn-text').style.display = 'none';
+      uploadBtn.querySelector('.btn-loading').style.display = 'inline';
+      uploadBtn.disabled = true;
+    });
+  });
+</script>

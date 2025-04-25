@@ -1,0 +1,44 @@
+<div class="ask-container">
+  <h2>Ask About Your Document</h2>
+  
+  <div class="document-info">
+    <p>Currently analyzing: <strong><%= @filename %></strong></p>
+  </div>
+  
+  <form action="/ask" method="post" id="question-form">
+    <div class="form-group">
+      <label for="question">What would you like to know about this document?</label>
+      <textarea id="question" name="question" rows="3" required placeholder="Enter your question here..."></textarea>
+      <div class="question-suggestions">
+        <small>Try questions like: "What is the main topic?" or "Can you summarize this document?"</small>
+      </div>
+    </div>
+    
+    <button type="submit" class="btn-primary" id="ask-btn">
+      <span class="btn-text">Get Answer</span>
+      <span class="btn-loading" style="display: none;">Analyzing...</span>
+    </button>
+  </form>
+  
+  <div class="navigation">
+    <a href="/" class="btn-secondary">Upload Different Document</a>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const questionForm = document.getElementById('question-form');
+    const askBtn = document.getElementById('ask-btn');
+    const questionTextarea = document.getElementById('question');
+    
+    // Focus on the textarea when the page loads
+    questionTextarea.focus();
+    
+    // Show loading state when form is submitted
+    questionForm.addEventListener('submit', function() {
+      askBtn.querySelector('.btn-text').style.display = 'none';
+      askBtn.querySelector('.btn-loading').style.display = 'inline';
+      askBtn.disabled = true;
+    });
+  });
+</script>
