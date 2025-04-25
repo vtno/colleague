@@ -1,6 +1,10 @@
 # Colleague [WIP]
 
-An AI assistant to automate daily tasks.
+An AI assistant to automate daily tasks. Build with mostly Copilot agent.
+
+This is a pet project to try out the capability of the Copilot agent.
+
+<img width="1792" alt="Screenshot 2025-04-25 at 23 01 21" src="https://github.com/user-attachments/assets/4c92c09d-c345-4717-975e-ed441d4604ee" />
 
 **TODO**
 
